@@ -9,6 +9,18 @@ start:
     mov ss, ax
     mov sp, 0x7C00
 
+    ; The BIOS saves the boot drive into DL when the
+    ; Bootloader is loaded, we need to save it before
+    ; it's overwritten
+    ; 0x00 Floppy
+    ; 0x80 First Hard Drive
+    mov [boot_drive], dl
+
+    ; Load kernel into memory BEFORE switching to
+    ; Protected Mode. Pushes the address onto the stack
+    ; so that ret comes back to this and continues
+    call load_kernel
+
     ; BIOS interrupts don't work in protected mode
     ; disable now before the CPU tries to handle
     ; a BIOS interrupt using the old interrupt table
@@ -29,6 +41,43 @@ start:
     ; Without this cs would still hold the Real Mode value 
     ; and cs can only be updated with special cases like jmp
     jmp 0x08:start_protected_mode
+
+; Disk Loading (Real Mode)
+
+; #define the starting address and sector amount
+KERNEL_LOAD_ADDRESS equ 0x1000  ; Must match linker.ld
+; 15 * 512 bytes = 7680 bytes
+KERNEL_SECTORS equ 15           ; How many 512-byte sectors to read
+
+load_kernel:
+    mov ah, 0x02                ; BIOS read sectors
+    mov al, KERNEL_SECTORS      ; Save number of sectors to read
+    mov ch, 0                   ; Cylinder 0
+    mov cl, 2                   ; Start at sector 2 because sector 1 is our bootloader
+    mov dh, 0                   ; Head 0
+    mov bx, KERNEL_LOAD_ADDRESS ; Load into this memory address
+    mov dl, [boot_drive]        ; Save which drive to read from
+    int 0x13                    ; Call BIOS disk service
+
+    jc disk_error               ; Jump if carry to disk_error
+
+    ret
+
+disk_error:
+    ; Print 'E' when there's a disk error and hang
+    mov ah, 0x0E
+    mov al, 'E'
+    int 0x10
+    mov al, 'R'
+    int 0x10
+    mov al, 'R'
+    int 0x10
+    mov al, 'O'
+    int 0x10
+    mov al, 'R'
+    int 0x10
+    cli
+    hlt
 
 ; Define GDT
 ; https://wiki.osdev.org/Global_Descriptor_Table
@@ -103,8 +152,13 @@ gdt_descriptor:
     dw gdt_end - gdt_start - 1  ; GDT size in bytes minus 1. Calculated at assembly time
     dd gdt_start                ; GDT address
 
+; Data
+; Initialize boot_drive to 0 so that it can be saved later with [boot_drive]
+boot_drive: db 0
+
 ; 32-bit Protected Mode
 [BITS 32]
+
 start_protected_mode:
     ; Update all data ssegment registers to point to the gdt_data segment (0x10)
     ; Since these registers are only 16-bit, we stick with ax here instead of eax
@@ -123,14 +177,17 @@ start_protected_mode:
     ; 32-bit version of sp
     mov esp, 0x90000
 
-    mov byte [0xB8000], 'H'     ; Character
-    mov byte [0xB8001], 0x0F    ; Color: White (F) on Black (0)
+    ; mov byte [0xB8000], 'H'     ; Character
+    ; mov byte [0xB8001], 0x0F    ; Color: White (F) on Black (0)
 
-    mov byte [0xB8002], 'I'
-    mov byte [0xB8003], 0xF0    ; Color: Black (0) on White (F)
+    ; mov byte [0xB8002], 'I'
+    ; mov byte [0xB8003], 0xF0    ; Color: Black (0) on White (F)
 
-    cli
-    hlt
+    ; cli
+    ; hlt
+
+    ; Jump to the entry point
+    jmp KERNEL_LOAD_ADDRESS
 
 times 510 - ($ - $$) db 0
 dw 0xAA55
