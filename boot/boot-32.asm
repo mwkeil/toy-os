@@ -50,6 +50,12 @@ KERNEL_LOAD_ADDRESS equ 0x1000  ; Must match linker.ld
 KERNEL_SECTORS equ 15           ; How many 512-byte sectors to read
 
 load_kernel:
+    ; Reset disk controller first
+    mov ah, 0x00
+    mov dl, [boot_drive]
+    int 0x13
+
+    ; Then read the kernel
     mov ah, 0x02                ; BIOS read sectors
     mov al, KERNEL_SECTORS      ; Save number of sectors to read
     mov ch, 0                   ; Cylinder 0
@@ -60,7 +66,6 @@ load_kernel:
     int 0x13                    ; Call BIOS disk service
 
     jc disk_error               ; Jump if carry to disk_error
-
     ret
 
 disk_error:

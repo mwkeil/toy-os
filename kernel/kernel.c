@@ -30,7 +30,7 @@ void print(const char *str, int row, int col) {
 }
 
 // Start the kernel, needs to match the linker
-void kernel_start() {
+void kernel_begin() {
     // Clear the screen
     for (int i = 0; i < 80 * 25; i++) {
         vga[i] = (COLOR_WHITE_ON_BLACK << 8) | ' ';
