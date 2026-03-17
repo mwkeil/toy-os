@@ -1,4 +1,6 @@
 #include "terminal.h"
+#include "idt.h"
+
 // Entry point for the kernel
 // Standard library functions can't be used (printf, malloc)
 
@@ -49,18 +51,23 @@
 
 void kernel_begin() {
     tinit();
+    idt_init();
 
     tprint("ToyOS\n");
     tprint("32-bit Protected Mode.\n");
     tprint("\n");
+    tprint("Interrupts enabled.\n");
     
-    tprint("Hex Test: ");
-    tprinthex(0xDEADBEEF);
-    tputchar('\n');
+    // tprint("Hex Test: ");
+    // tprinthex(0xDEADBEEF);
+    // tputchar('\n');
     
-    tprint("Int Test: ");
-    tprintint(12345);
-    tputchar('\n');
+    // tprint("Int Test: ");
+    // tprintint(12345);
+    // tputchar('\n');
+
+    // Test exception handler with division by zero
+    int x = 1 / 0;
 
     while (1) {}
 }
